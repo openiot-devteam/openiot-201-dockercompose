@@ -25,7 +25,7 @@ services:
      # 초기 설정 후 주석 필요함 데이터 초기화됨
      # - ./init:/docker-entrypoint-initdb.d
     ports:
-      - "5433:5433"
+      - "5433:5432"
     restart: unless-stopped
 
   # Spring Boot Application
