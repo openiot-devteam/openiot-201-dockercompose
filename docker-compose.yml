@@ -1,0 +1,86 @@
+version: "3.9"
+name: openiot-stack
+
+networks:
+  openiot-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  queue_data:
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    platform: linux/amd64
+    container_name: postgres
+    networks: [openiot-net]
+    environment:
+      POSTGRES_DB: iot_project_201
+      POSTGRES_USER: nova
+      POSTGRES_PASSWORD: postgres
+      TZ: Asia/Seoul
+      POSTGRES_TIMEZONE: Asia/Seoul
+      PGTZ: Asia/Seoul
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+     # 초기 설정 후 주석 필요함 데이터 초기화됨
+     # - ./init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # Spring Boot Application
+  app:
+    image: jaeminlee0915/iot-project-201:latest
+    platform: linux/amd64
+    container_name: iot-project-201
+    networks: [openiot-net]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/iot_project_201
+      SPRING_DATASOURCE_USERNAME: nova
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_PROFILES_ACTIVE: docker
+      CORS_ALLOWED_ORIGINS: http://210.117.163.237:3100, http://210.117.163.237:5000, http://210.117.163.237:24012, http://210.117.163.237:24013
+      TZ: Asia/Seoul
+      JAVA_OPTS: -Duser.timezone=Asia/Seoul
+    depends_on:
+      - postgres
+    ports:
+      - "24011:8080"
+    restart: unless-stopped
+
+  # Queue Server
+  queue-server:
+    image: 0peniot/queue-server:latest
+    platform: linux/amd64
+    container_name: queue-server
+    networks: [openiot-net]
+    environment:
+      QUEUE_DB_PATH: /data/queue.db
+      LOCK_TIMEOUT: "600"
+      CORS_ALLOWED_ORIGINS: http://210.117.163.237:3100,http://210.117.163.237:4000, http://210.117.163.237:24012, http://210.117.163.237:24013
+      TZ: Asia/Seoul
+    volumes:
+      - queue_data:/data
+    ports:
+      - "24013:5000"
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    image: 0peniot/adminpage-frontend:latest
+    platform: linux/amd64
+    container_name: adminpage-frontend
+    networks: [openiot-net]
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_BASE_URL_PROD: http://210.117.163.237:24011
+      NEXT_PUBLIC_MQTT_HTTP_SERVER: http://210.117.163.237:24013
+      NEXT_PUBLIC_MQTT_QUEUE_SERVER: http://210.117.163.237:24013
+      NEXT_PUBLIC_CAM_STREAM_PORT: "5000"
+      TZ: Asia/Seoul
+    ports:
+      - "24012:3000"
+    restart: unless-stopped
